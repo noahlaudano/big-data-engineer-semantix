@@ -1,0 +1,143 @@
+
+ELASTIC 
+
+EXERCÍCIOS AULA 2.1
+
+POST produto/_doc/1 {"nome": "mouse", "qtd": 50, "descricao": "com fio USB, compatível com Windows, Mac e Linux"}
+
+POST produto/_doc/2 {"nome": "hd", "qtd": 20, "descricao": "Interface USB 2.0, 500GB, Sistema: Windows 10, Windows 8, Windows 7"}
+
+POST produto/_doc/3 {"nome": "memória ram", "qtd": 10, "descricao": "8GB, DDR4"}
+
+POST produto/_doc/4 {"nome": "cpu", "qtd": 15, "descricao": "i5, 2.5Ghz"}
+
+HEAD produto/_doc/3
+
+POST produto/_update/3 {"doc":{"qtd":30}}
+
+GET produto/_doc/1
+
+DELETE produto/_doc/4
+
+GET produto/_count
+
+
+EXERCÍCIOS AULA 2.2
+
+GET concessionaria2/_count
+GET populacao/_count
+
+GET concessionaria2/_search
+GET populacao/_search
+
+
+EXERCÍCIOS AULA 3.1
+
+GET produto/_search?q=nome:mouse
+GET produto/_search?q=qtd:30
+GET produto/_search?q=descricao:usb
+GET produto/_search?q=nome:hd&q=descricao:windows
+GET produto/_search?q=nome:memoria&q=descricao:gb
+GET _all/_search?&size=5&from=15
+
+
+EXERCÍCIOS AULA 3.2
+
+GET produto/_settings
+GET produto/_mapping
+GET produto/_mapping/field/nome
+PUT produto/_mapping/ {"properties": {"data":{"type":"date"}}}
+PUT produto/_doc/6 {"nome": "teclado", "qtd": 100, "descricao": "USB", "data":"2020-09-18"}
+PUT produto2 {}
+PUT produto2/_mapping { ... GET produto/_mapping ... troca long para short e roda o mapping }
+POST _reindex {"source":{"index":"produto"}, "dest":{"index":"produto2"}}
+GET produto2/_mapping
+POST produto/_close
+GET produto/_search
+POST produto/_open
+
+
+EXERCÍCIOS AULA 4.1
+
+GET produto/_search { "query":{ "term":{ "nome":"mouse" } } } 
+
+GET produto/_search { "query":{ "terms":{ "nome":["mouse","teclado"] } } }
+
+GET produto/_search { "query":{ "constant_score":{ "filter":{ "term":{ "nome":"mouse" } } } } }
+
+GET produto/_search { "query":{ "constant_score":{ "filter":{ "terms":{ "nome":["mouse","teclado"] } } } } }
+
+GET produto/_search { "query":{ "match":{ "descricao":"USB" } } }
+
+GET produto/_search { "query":{ "bool":{ "must":[{"match":{ "descricao":"USB" }}], "must_not":[{ "match":{ "descricao":"linux" }}] } } }
+
+GET produto/_search { "query":{ "bool":{ "should":[{"match":{ "nome":"memória" }}, {"match":{"descricao":"USB"}}], "must_not":[{ "match": { "descricao":"Linux" }}] } } }
+
+
+EXERCÍCIOS AULA 4.2
+
+GET produto/_search {"query": {"match": {"descricao":{"query":"Windows Linux", "operator":"and"}}}}
+
+GET produto/_search {"query": {"match": {"descricao":"Windows Linux USB"}}}
+
+GET produto/_search {"query": {"match": {"descricao": {"query":"Windows Linux USB","minimum_should_match":2}}}}
+
+GET produto/_search {"query": {"match": {"descricao": {"query":"Windows Linux USB", "minimum_should_match":"50%"}}}}
+
+
+EXERCÍCIOS AULA 4.3
+
+HEAD populacao
+
+GET populacao/_search {"query": {"range": {"Total Population": {"lt":100}}}}
+
+GET populacao/_search {"query": {"range": {"Median Age": {"gt":70}}}}
+
+GET populacao/_search {"query": {"range": {"Zip Code": {"gte":90056, "lte":90067}}}}
+
+GET bolsa/_search {"query": {"range": {"timestamp": {"gte":"2019-01-01", "lte":"2019-03-01", "format": "yyyy-MM-dd"}}}}
+
+GET bolsa/_search {"query": {"range": {"timestamp": {"gte":"2019-04-01","lte":"now", "format":"yyyy-MM-dd"}}}}
+
+
+EXERCÍCIOS AULA 5.1
+
+POST _analyze { "analyzer":"simple", "text":"O elasticsearch surgiu em 2010" }
+
+POST _analyze { "analyzer":"standard", "text":"O elasticsearch surgiu em 2010" }
+
+POST _analyze { "analyzer":"brazilian", "text":"O elasticsearch surgiu em 2010" }
+
+POST _analyze { "analyzer":"portuguese", "text":"O elasticsearch surgiu em 2010" }
+
+GET produto/_mapping
+
+PUT produto1 {"settings":{"index":{"number_of_shards":1,"numer_of_replicas":0}},"mappings":{"properties":{"descricao":{"type":"text", "analyzer":"brazilian"}}}}
+
+POST _reindex {"source":{"index":"produto"},"dest":{"index":"produto1"}}
+
+GET produto1/_mapping
+
+PUT produto {"settings":{"index":{"number_of_shards":1,"numer_of_replicas":0}},"mappings":{"properties":{"descricao":{"type":"text", "analyzer":"brazilian", "fields":{"original":{"type":"keyword"}}}}}}
+
+GET produto/_search {"query":{"match":{"descricao":"compativel"}}}
+
+
+EXERCÍCIOS AULA 5.2
+
+GET bolsa/_search {"size":0, "aggs":{"media":{"avg":{"field":"volume"}}}}
+
+GET bolsa/_search {"size":0, "aggs":{"estatistica":{"stats":{"field":"close"}}}}
+
+GET bolsa/_search {"query":{"range":{"@timestamp":{"gte":"2019-04-01","lte":now}}}}
+
+GET bolsa/_search {"query":{"range":{"@timestamp":{"gte":"2019-04-01","lte":now}}}, "aggs":{"estatistica":{"stats":{"field":"open"}}}}
+
+GET bolsa/_search {"size":0, "aggs":{"mediana":{"percentiles":{"field":"open", "percents":[50]}}}}
+
+GET bolsa/_search {"size":0, "aggs":{"doc_anos":{"date_histogram":{"field":"@timestamp", "calendar_interval":"year"}}}}
+
+GET bolsa/_search {"size":0, "aggs":{"qtd_2anos":{"date_range":{"field":"@timestamp", "ranges":[{"from":"now-2y","to":"now"}]}}}}
+
+Verificar os indices:
+GET _cat/indices?v
