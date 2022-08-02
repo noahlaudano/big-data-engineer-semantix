@@ -1,0 +1,145 @@
+### AULA 8 ###
+
+No jupyter-spark bash ...
+spark-shell --packages org.apache.spark:spark-streaming-kafka-0-10_2.11:2.4.1
+
+scala> ...
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.spark.streaming.kafka010._
+import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
+import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
+import org.apache.spark.streaming.{StreamingContext, Seconds} 
+
+
+val kafkaParams = Map[String, Object](
+  "bootstrap.servers" -> "kafka:9092",
+  "key.deserializer" -> classOf[StringDeserializer],
+  "value.deserializer" -> classOf[StringDeserializer],
+  "group.id" -> "aplicacao2",
+  "auto.offset.reset" -> "earliest",
+  "enable.auto.commit" -> (false: java.lang.Boolean)
+)
+
+val ssc = new StreamingContext(sc, Seconds(5))  
+
+val topic = Array("topic-kvspark")
+
+val dstream = KafkaUtils.createDirectStream[String, String](
+  ssc,
+  PreferConsistent,
+  Subscribe[String, String](topic, kafkaParams)
+)
+
+val info_dstream = dstream.map(record => (
+    record.topic,
+    record.partition,
+    record.key,
+    record.value)
+)
+
+info_dstream.saveAsTextFiles("/user/nathalia/kafka/dstreamkv")
+
+ssc.start()
+
+############################################################
+
+### AULA 9 ###
+
+import org.apache.spark.sql._
+import org.apache.spark.sql.types._
+
+val read_str = spark.readStream.format("socket").option("host","localhost").option("port",9999).load()
+
+val write_str = read_str.writeStream.format("console").start()
+
+val user_schema = new StructType().add("sepal_length", "float").add("sepal_width", "float").add("petal_length","float").add("petal_width", "float").add("class", "string") 
+
+val read_csv_df = spark.readStream.schema(user_schema).csv("/user/nathalia/data/input/iris/*.data")
+
+read_csv_df.printSchema()
+
+read_csv_df.writeStream.format("csv").option("checkpointLocation","/user/nathalia/stream_iris/check").option("path","/user/nathalia/stream_iris/path").start()
+
+hdfs dfs -ls /user/nathalia/stream_iris/path
+
+val words = read_str.as[String].flatMap(_.split(" "))
+val wordCounts = words.groupBy("value").count()
+
+-------------------------------------------------
+
+> 9 parte 2 <
+
+from pyspark.streaming import kafka
+from pyspark.sql.functions import col
+from pyspark.sql.types import StringType
+
+topic_read = spark.read\
+    .format('kafka')\
+    .option('kafka.bootstrap.servers','kafka:9092')\
+    .option('subscribe','topic-kvspark')\
+    .load()
+
+topic_read.printSchema()
+
+topic_string = topic_read.select(col('key').cast('string'),col('value').cast('string'))
+topic_string.show()
+
+topic_read_stream = spark.read\
+    .format('kafka')\
+    .option('kafka.bootstrap.servers','kafka:9092')\
+    .option('subscribe','topic-kvspark')\
+    .load()
+
+topic_read_stream.printSchema()
+
+topic_string_stream = topic_read_stream.select(col('key').cast('string'),col('value').cast('string'))
+
+kafka_df.select(col('key').cast(StringType), col("value").cast(StringType)).show()
+
+kafka_df.writeStream.format('console').start()
+
+kafka_df.writeStream.format('kafka').option('kafka.bootstrap.servers','host1:port1,host2:port2').option('topic','topic-kvspark-output').trigger(Trigger.Continuos('5 seconds')).start()
+
+
+############################################################
+
+### AULA 10 ###
+
+a) 20 nodes x 8 cores | 16Gb RAM
+
+--driver-memory = 8G
+--executor-memory = ((20*16)-10%)/39 = 8G
+--conf spark.yarn.driver.memoryOverhead = 3G
+--conf spark.yarn.executor.memoryOverhead = 2
+--executors-core = 4
+--num-executors = ((20*8)-10%)/4 = 39
+
+b) 9 nodes x 20 cores | 128Gb RAM
+
+--driver-memory = 8G
+--executor-memory = ((128*9)-10%)/40 = 25G
+--conf spark.yarn.driver.memoryOverhead = 2G
+--conf spark.yarn.executor.memoryOverhead = 4
+--executors-core = 4
+--num-executors = ((20*9)-10%)/4 = 40
+
+c) 6 nodes x 10 cores | 32Gb RAM – 3 Jobs em paralelo
+
+--driver-memory = 8G
+--executor-memory = (((32*6)-10%)/4)/3 = 14G
+--conf spark.yarn.driver.memoryOverhead = 2G
+--conf spark.yarn.executor.memoryOverhead = 1
+--executors-core = 4
+--num-executors (((10*6)-10%)/4)/3 = 4
+
+d) 10 nodes x 16 cores | 64Gb RAM – 50 % dos recursos já utilizados
+
+--driver-memory = 8G
+--executor-memory = (((64*10)-10%)/18)/2 = 16G
+--conf spark.yarn.driver.memoryOverhead = 1G
+--conf spark.yarn.executor.memoryOverhead = 2
+--executors-core = 4
+--num-executors (((16*10)-10%)/4)/2 = 18
+
+
